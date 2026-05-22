@@ -149,6 +149,12 @@
             <span class="valor" id="formapago"></span>
         </div>
 
+        <!-- Campo Saldo Actual -->
+        <div class="dato">
+            <span class="label">Saldo Actual:</span>
+            <span class="valor" id="saldoactual"></span>
+        </div>
+
         <hr class="divider">
 
         <div class="total">
@@ -169,23 +175,49 @@
 
     <script>
         const params = new URLSearchParams(window.location.search);
-        document.getElementById('nombre').textContent = params.get('nombre');
-        document.getElementById('fecha').textContent = params.get('fecha');
-        document.getElementById('formapago').textContent = params.get('formapago');
-        document.getElementById('abono').textContent = '$ ' + params.get('abono');
+        document.getElementById('nombre').textContent = params.get('nombre') || '';
+        document.getElementById('fecha').textContent = params.get('fecha') || '';
+        document.getElementById('formapago').textContent = params.get('formapago') || '';
+        document.getElementById('abono').textContent = '$ ' + (params.get('abono') || '0.00');
+        
+        const saldoActualVal = params.get('saldoactual') || '0.00';
+        document.getElementById('saldoactual').textContent = '$ ' + saldoActualVal;
 
-        const nombre = params.get('nombre');
-        const fecha = params.get('fecha');
-        const formapago = params.get('formapago');
-        const abono = params.get('abono');
+        const nombre = params.get('nombre') || '';
+        const fecha = params.get('fecha') || '';
+        const formapago = params.get('formapago') || '';
+        const abono = params.get('abono') || '0.00';
+        const saldoactual = saldoActualVal;
 
         function imprimirManual() {
             window.print();
         }
 
         window.onload = async function() {
+            // Manejador global para prevenir errores no capturados de seguridad de WebSockets en el entorno de desarrollo/Canvas
+            const originalConsoleError = console.error;
+            console.error = function(...args) {
+                if (args[0] && (args[0].toString().includes("WebSocket") || args[0].toString().includes("SecurityError"))) {
+                    // Ocultamos de la consola visual el SecurityError repetitivo de WebSockets en modo desarrollo
+                    return;
+                }
+                originalConsoleError.apply(console, args);
+            };
+
             try {
-                await qz.websocket.connect();
+                // Validación para evitar bloqueos del navegador si se ejecuta dentro de un iframe con políticas estrictas de seguridad (Sandbox)
+                if (window.location.hostname === "localhost" || window.location.protocol === "file:") {
+                    console.log("Modo local o restringido detectado. Intentando conexión segura.");
+                }
+
+                document.getElementById('status').textContent = 'Intentando conectar con impresora local...';
+                
+                // Conectamos con un timeout controlado para evitar esperas infinitas o fallas de seguridad del navegador
+                await Promise.race([
+                    qz.websocket.connect(),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout al conectar con QZ Tray")), 4000))
+                ]);
+
                 document.getElementById('status').textContent = '✅ Impresora conectada, imprimiendo...';
 
                 const config = qz.configs.create("PR-255");
@@ -204,6 +236,7 @@
                     "Nombre:  " + nombre + "\n",
                     "Fecha:   " + fecha + "\n",
                     "F. Pago: " + formapago + "\n",
+                    "S. Act:  $ " + saldoactual + "\n",
                     "--------------------------------\n",
                     "\x1B\x21\x10",       // Texto doble ancho
                     "ABONO: $ " + abono + "\n",
@@ -221,8 +254,9 @@
                 document.getElementById('status').textContent = '✅ Impreso correctamente';
 
             } catch (err) {
-                console.error(err);
-                document.getElementById('status').textContent = '⚠️ QZ Tray no disponible, usa el botón manual';
+                // Captura controlada del error de WebSocket/Seguridad
+                console.warn("No se pudo conectar de manera automática con QZ Tray:", err.message);
+                document.getElementById('status').textContent = '⚠️ QZ Tray no disponible o bloqueado por seguridad. Usa el botón manual.';
                 document.getElementById('btnManual').style.display = 'block';
             }
         }
