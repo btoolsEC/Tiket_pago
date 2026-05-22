@@ -256,8 +256,8 @@
 
                 document.getElementById('status').innerHTML = '✅ Impresora conectada. Enviando ticket...';
 
-                // Configurar la impresora con el nombre exacto de tu ticketera térmica (ej: "PR-255")
-                const config = qz.configs.create("PR-255");
+                // Configurar la impresora con el nombre exacto registrado en tu sistema ("POSPrinter POS80")
+                const config = qz.configs.create("POSPrinter POS80");
 
                 // Construcción de comandos ESC/POS para la ticketera física (Abono primero, Saldo Actual después)
                 const data = [
@@ -299,7 +299,7 @@
                 console.warn("Conexión directa a QZ Tray omitida/fallida:", err.message);
                 
                 // Mensaje amigable si QZ Tray no está abierto en la computadora del usuario
-                document.getElementById('status').innerHTML = '⚠️ No se pudo conectar automáticamente con la ticketera.<br><small>Asegúrate de tener QZ Tray abierto en tu computadora o usa el botón de abajo.</small>';
+                document.getElementById('status').innerHTML = '⚠️ No se pudo conectar automáticamente con la ticketera.<br><small>Asegúrate de tener QZ Tray abierto en tu computadora y que la impresora "POSPrinter POS80" esté encendida.</small>';
                 document.getElementById('btnManual').style.display = 'block';
             }
         }
