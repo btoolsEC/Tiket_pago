@@ -126,30 +126,39 @@
             font-size: 10pt;
             color: #333;
             text-align: center;
-            max-width: 300px;
-            line-height: 1.4;
-            padding: 8px;
+            max-width: 320px;
+            line-height: 1.5;
+            padding: 12px;
             border-radius: 6px;
             background-color: #fff;
             border: 1px solid #ddd;
+        }
+
+        .diagnostic-box {
+            font-size: 8pt;
+            color: #d32f2f;
+            background-color: #ffebee;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 8px;
+            text-align: left;
+            border-left: 3px solid #f44336;
         }
 
         /* --- REGLAS EXCLUSIVAS PARA IMPRESIÓN --- */
         @media print {
             body {
                 background-color: #fff;
-                display: block; /* Desactiva flexbox para evitar desajustes en el papel */
+                display: block;
                 min-height: auto;
                 padding: 0;
                 margin: 0;
             }
 
-            /* Oculta por completo el botón y los mensajes de estado */
             .btn-print, .status {
                 display: none !important;
             }
 
-            /* Ajusta el ticket para que se adapte perfectamente al ancho del papel térmico */
             .ticket {
                 width: 100% !important;
                 max-width: 80mm;
@@ -163,7 +172,11 @@
 </head>
 <body>
 
-    <p class="status" id="status">Iniciando servicio de impresión...</p>
+    <div class="status" id="statusBox">
+        <span id="statusText">Iniciando servicio de impresión...</span>
+        <div id="diagnostic" style="display:none" class="diagnostic-box"></div>
+    </div>
+    
     <button class="btn-print" id="btnManual" style="display:none" onclick="imprimirManual()">🖨️ Imprimir Manual (Ctrl+P)</button>
 
     <div class="ticket" id="ticket">
@@ -224,7 +237,7 @@
         const abono = params.get('abono') || '0.00';
         const saldoactual = params.get('saldoactual') || '0.00';
 
-        // Pintar los datos en el ticket visual sin concatenar el signo de dólar duplicado
+        // Pintar los datos en el ticket visual
         document.getElementById('nombre').textContent = nombre;
         document.getElementById('fecha').textContent = fecha;
         document.getElementById('formapago').textContent = formapago;
@@ -236,7 +249,7 @@
         }
 
         window.onload = async function() {
-            // Manejador global para suprimir las alertas de consola en entornos con restricciones WebSocket
+            // Manejador global para suprimir alertas redundantes de consola en entornos con restricciones WebSocket
             const originalConsoleError = console.error;
             console.error = function(...args) {
                 if (args[0] && (args[0].toString().includes("WebSocket") || args[0].toString().includes("SecurityError"))) {
@@ -245,27 +258,31 @@
                 originalConsoleError.apply(console, args);
             };
 
+            const statusText = document.getElementById('statusText');
+            const diagnosticBox = document.getElementById('diagnostic');
+            const btnManual = document.getElementById('btnManual');
+
             try {
-                document.getElementById('status').innerHTML = 'Conectando con <strong>QZ Tray</strong> local...';
+                statusText.innerHTML = 'Conectando con <strong>QZ Tray</strong> local...';
 
                 // Intentar conectar con QZ Tray con un tiempo límite de 8 segundos
                 await Promise.race([
                     qz.websocket.connect(),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error("La conexión tardó demasiado")), 8000))
+                    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout de conexión (8s)")), 8000))
                 ]);
 
-                document.getElementById('status').innerHTML = '✅ Impresora conectada. Enviando ticket...';
+                statusText.innerHTML = '✅ Conectado a QZ. Enviando a <strong>POSPrinter POS80</strong>...';
 
-                // Configurar la impresora con el nombre exacto registrado en tu sistema ("POSPrinter POS80")
+                // Configurar la impresora física
                 const config = qz.configs.create("POSPrinter POS80");
 
-                // Construcción de comandos ESC/POS para la ticketera física (Abono primero, Saldo Actual después)
+                // Comandos ESC/POS para la ticketera
                 const data = [
                     "\x1B\x40",           // Resetear impresora
                     "\x1B\x61\x01",       // Centrar texto
                     "\x1B\x21\x30",       // Texto en tamaño grande
                     "MADELU\n",
-                    "\x1B\x21\x00",       // Volver a texto normal
+                    "\x1B\x21\x00",       // Texto normal
                     "Comprobante de Pago\n",
                     "--------------------------------\n",
                     "\x1B\x61\x00",       // Alinear a la izquierda
@@ -275,32 +292,37 @@
                     "Fecha:   " + fecha + "\n",
                     "F. Pago: " + formapago + "\n",
                     "--------------------------------\n",
-                    "\x1B\x21\x10",       // Texto con doble ancho para destacar el Abono
-                    "ABONO: " + abono + "\n",  // Removido el signo "$" duplicado
-                    "\x1B\x21\x00",       // Retornar a texto normal
+                    "\x1B\x21\x10",       // Doble ancho para Abono
+                    "ABONO: " + abono + "\n",
+                    "\x1B\x21\x00",       // Retornar a normal
                     "--------------------------------\n",
-                    "S. Act:  " + saldoactual + "\n", // Removido el signo "$" duplicado y movido después del Abono
+                    "S. Act:  " + saldoactual + "\n",
                     "--------------------------------\n",
-                    "\x1B\x61\x01",       // Centrar texto
+                    "\x1B\x61\x01",       // Centrar
                     "Gracias por su pago!\n",
                     "App por BtoolsEC\n",
-                    "\n\n\n",             // Espaciado para el corte
-                    "\x1D\x56\x41\x10"    // Comando físico para cortar el papel
+                    "\n\n\n",             // Espacio de corte
+                    "\x1D\x56\x41\x10"    // Cortar
                 ];
 
-                // Enviar trabajo a la impresora
                 await qz.print(config, data);
-                
-                // Desconectar ordenadamente de QZ Tray
                 await qz.websocket.disconnect();
-                document.getElementById('status').innerHTML = '✅ ¡Ticket impreso con éxito!';
+                statusText.innerHTML = '✅ ¡Ticket impreso correctamente!';
 
             } catch (err) {
-                console.warn("Conexión directa a QZ Tray omitida/fallida:", err.message);
+                console.warn("Error de enlace QZ:", err.message);
                 
-                // Mensaje amigable si QZ Tray no está abierto en la computadora del usuario
-                document.getElementById('status').innerHTML = '⚠️ No se pudo conectar automáticamente con la ticketera.<br><small>Asegúrate de tener QZ Tray abierto en tu computadora y que la impresora "POSPrinter POS80" esté encendida.</small>';
-                document.getElementById('btnManual').style.display = 'block';
+                statusText.innerHTML = '⚠️ <strong>QZ Tray no responde</strong>';
+                btnManual.style.display = 'block';
+                
+                // Mostrar caja de diagnóstico para ayudarte a encontrar la falla local
+                diagnosticBox.style.display = 'block';
+                diagnosticBox.innerHTML = `
+                    <strong>Guía de solución rápida:</strong><br>
+                    • Asegúrate de que el programa <strong>QZ Tray</strong> esté abierto en tu PC (icono "Q" verde).<br>
+                    • Abre una pestaña e ingresa a <a href="https://localhost:8183" target="_blank" style="color:#d32f2f; font-weight:bold;">https://localhost:8183</a> para aprobar el certificado de seguridad de Windows si el navegador lo bloqueó.<br>
+                    • Error reportado: <em>${err.message}</em>
+                `;
             }
         }
     </script>
