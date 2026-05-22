@@ -261,7 +261,7 @@
         });
 
         window.onload = async function() {
-            // Manejador global para suprimir alertas redundantes de consola en entornos con restricciones WebSocket
+            // Manejador global para suprimir alertas de seguridad en la consola de desarrollo
             const originalConsoleError = console.error;
             console.error = function(...args) {
                 if (args[0] && (args[0].toString().includes("WebSocket") || args[0].toString().includes("SecurityError"))) {
@@ -274,18 +274,24 @@
             const diagnosticBox = document.getElementById('diagnostic');
             const btnManual = document.getElementById('btnManual');
 
-            // Colocamos un aviso temporal si se demora la conexión nativa de QZ
+            // Si la conexión tarda más de 3.5 segundos, mostramos de inmediato el botón de Impresión Manual
+            // para que el usuario no se quede esperando y pueda imprimir sin problemas
             let warningTimeout = setTimeout(() => {
-                statusText.innerHTML = '⚡ <strong>La conexión está demorando...</strong><br><small>QZ Tray está buscando la impresora local. Por favor, espera.</small>';
+                statusText.innerHTML = '⚡ <strong>La conexión está demorando...</strong><br><small>QZ Tray no responde. Si deseas, puedes usar el botón de abajo para imprimir de inmediato.</small>';
+                btnManual.style.display = 'block';
             }, 3500);
 
             try {
                 statusText.innerHTML = 'Conectando con <strong>QZ Tray</strong> local...';
 
-                // Nos conectamos de manera persistente a QZ Tray
-                await qz.websocket.connect({ keepAlive: 15 });
+                // Implementamos un límite de tiempo (timeout) de 5 segundos.
+                // Si en 5 segundos no se logra la conexión por red local, se cancela y se salta al catch.
+                await Promise.race([
+                    qz.websocket.connect({ keepAlive: 15 }),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error("La impresora local no respondió a tiempo (Timeout 5s)")), 5000))
+                ]);
                 
-                // Si conecta exitosamente, limpiamos el temporizador de advertencia
+                // Si la conexión fue exitosa, cancelamos el temporizador de advertencia
                 clearTimeout(warningTimeout);
 
                 statusText.innerHTML = '✅ Conectado a QZ. Enviando a <strong>POSPrinter POS80</strong>...';
@@ -327,26 +333,21 @@
                 statusText.innerHTML = '✅ ¡Ticket impreso en POSPrinter POS80!';
 
             } catch (err) {
+                // Cancelar temporizador ya que detectamos el fin del intento (con error)
                 clearTimeout(warningTimeout);
                 console.warn("Error de enlace QZ:", err.message);
                 
-                statusText.innerHTML = '⚠️ <strong>QZ Tray no disponible en esta PC</strong>';
+                statusText.innerHTML = '⚠️ <strong>Impresión automática no disponible</strong>';
                 btnManual.style.display = 'block';
                 
-                // Caja de diagnóstico optimizada para POSPrinter POS80
+                // Caja de diagnóstico útil para cuando la conexión no se logra establecer
                 diagnosticBox.style.display = 'block';
                 diagnosticBox.innerHTML = `
-                    <strong>Guía de solución rápida en tu computadora:</strong><br><br>
-                    <strong>1. Abre QZ Tray:</strong><br>
-                    Verifica que el icono de la <strong>"Q" verde</strong> esté visible al lado del reloj de Windows.<br><br>
-                    
-                    <strong>2. Verifica el nombre exacto:</strong><br>
-                    La impresora térmica debe llamarse exactamente <strong>"POSPrinter POS80"</strong> en tu Panel de Control de Windows.<br><br>
-                    
-                    <strong>3. Permisos en el Navegador:</strong><br>
-                    Si te da error de bloqueo, haz clic derecho sobre la "Q" verde de QZ Tray, selecciona <em>Exit</em>, vuelve a abrir el programa y confirma los permisos ("Allow") al recargar esta página web.<br><br>
-                    
-                    <em>Detalle del error: ${err.message}</em>
+                    <strong>Guía de solución rápida:</strong><br><br>
+                    • Asegúrate de tener abierto <strong>QZ Tray</strong> en tu computadora (icono "Q" verde al lado del reloj).<br>
+                    • Si usas HTTPS (dirección segura en la web), el navegador a veces bloquea conexiones locales. Puedes usar el botón verde de <strong>"Imprimir Manual"</strong> que hará una impresión clásica excelente y limpia.<br>
+                    • Tu impresora térmica debe llamarse <strong>POSPrinter POS80</strong> en Windows.<br><br>
+                    <em>Detalle técnico: ${err.message}</em>
                 `;
             }
         }
