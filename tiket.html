@@ -188,6 +188,11 @@
         document.getElementById('fecha').textContent = params.get('fecha');
         document.getElementById('formapago').textContent = params.get('formapago');
         document.getElementById('abono').textContent = '$ ' + params.get('abono');
+
+        // Imprimir automáticamente al cargar
+    window.onload = function() {
+        window.print();
+    }
     </script>
 
 </body>
