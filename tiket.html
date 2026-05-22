@@ -4,9 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
+        @page {
+            size: 80mm auto;
+            margin: 0;
+        }
+
         body {
             margin: 0;
-            padding: 0;
+            padding: 20px;
             font-family: 'Courier New', monospace;
             background-color: #f0f0f0;
             display: flex;
@@ -14,20 +19,35 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            gap: 10px;
+            gap: 15px;
+            box-sizing: border-box;
+        }
+
+        @media print {
+            body {
+                background-color: white;
+                padding: 0;
+                display: block;
+            }
+            .btn-print {
+                display: none;
+            }
+            .ticket {
+                border: none !important;
+                box-shadow: none !important;
+            }
         }
 
         .btn-print {
-            padding: 12px 30px;
+            padding: 12px 40px;
             background-color: #4CAF50;
             color: white;
             border: none;
             border-radius: 8px;
             font-size: 14pt;
-            cursor: pointer;
             font-weight: bold;
+            cursor: pointer;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: background-color 0.2s;
         }
 
         .btn-print:hover {
@@ -40,7 +60,7 @@
             padding: 4mm;
             box-sizing: border-box;
             border: 0.1mm solid #ddd;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
         }
 
         .header {
@@ -121,66 +141,13 @@
             color: #aaa;
             margin-top: 2mm;
         }
-
-        .status {
-            font-size: 10pt;
-            color: #333;
-            text-align: center;
-            max-width: 320px;
-            line-height: 1.5;
-            padding: 12px;
-            border-radius: 6px;
-            background-color: #fff;
-            border: 1px solid #ddd;
-        }
-
-        .diagnostic-box {
-            font-size: 8.5pt;
-            color: #d32f2f;
-            background-color: #ffebee;
-            padding: 10px;
-            border-radius: 4px;
-            margin-top: 8px;
-            text-align: left;
-            border-left: 3px solid #f44336;
-            line-height: 1.4;
-        }
-
-        /* --- REGLAS EXCLUSIVAS PARA IMPRESIÓN --- */
-        @media print {
-            body {
-                background-color: #fff;
-                display: block;
-                min-height: auto;
-                padding: 0;
-                margin: 0;
-            }
-
-            .btn-print, .status {
-                display: none !important;
-            }
-
-            .ticket {
-                width: 100% !important;
-                max-width: 80mm;
-                border: none !important;
-                box-shadow: none !important;
-                padding: 0 !important;
-                margin: 0 auto;
-            }
-        }
     </style>
 </head>
 <body>
 
-    <div class="status" id="statusBox">
-        <span id="statusText">Iniciando servicio de impresión...</span>
-        <div id="diagnostic" style="display:none" class="diagnostic-box"></div>
-    </div>
-    
-    <button class="btn-print" id="btnManual" style="display:none" onclick="imprimirManual()">🖨️ Imprimir Manual (Ctrl+P)</button>
+    <button class="btn-print" onclick="window.print()">🖨️ Imprimir Ticket</button>
 
-    <div class="ticket" id="ticket">
+    <div class="ticket">
         <div class="header">
             <h1>MADELU</h1>
             <p>Comprobante de Pago</p>
@@ -205,7 +172,6 @@
 
         <hr class="divider">
 
-        <!-- Primero se muestra el Abono realizado -->
         <div class="total">
             <span>ABONO:</span>
             <span id="abono"></span>
@@ -213,143 +179,22 @@
 
         <hr class="divider">
 
-        <!-- Después se muestra el Saldo Actual resultante -->
-        <div class="dato">
-            <span class="label">Saldo Actual:</span>
-            <span class="valor" id="saldoactual"></span>
-        </div>
-
         <div class="footer">
             <p>¡Gracias por su pago!</p>
             <p class="btoolsec">App desarrollada por BtoolsEC</p>
         </div>
     </div>
 
-    <!-- QZ Tray -->
-    <script src="https://cdn.jsdelivr.net/npm/qz-tray@2.2.4/qz-tray.js"></script>
-
     <script>
-        // Obtener parámetros de la URL enviados desde AppSheet
         const params = new URLSearchParams(window.location.search);
-        
-        const nombre = params.get('nombre') || 'N/D';
-        const fecha = params.get('fecha') || 'N/D';
-        const formapago = params.get('formapago') || 'N/D';
-        const abono = params.get('abono') || '0.00';
-        const saldoactual = params.get('saldoactual') || '0.00';
+        document.getElementById('nombre').textContent = params.get('nombre') || 'N/D';
+        document.getElementById('fecha').textContent = params.get('fecha') || 'N/D';
+        document.getElementById('formapago').textContent = params.get('formapago') || 'N/D';
+        document.getElementById('abono').textContent = '$ ' + (params.get('abono') || '0.00');
 
-        // Pintar los datos en el ticket visual
-        document.getElementById('nombre').textContent = nombre;
-        document.getElementById('fecha').textContent = fecha;
-        document.getElementById('formapago').textContent = formapago;
-        document.getElementById('saldoactual').textContent = saldoactual;
-        document.getElementById('abono').textContent = abono;
-
-        function imprimirManual() {
+        // Abrir diálogo de impresión automáticamente al cargar
+        window.onload = function() {
             window.print();
-        }
-
-        // Configuración requerida para saltar bloqueos de seguridad del cliente local de QZ Tray
-        qz.security.setCertificatePromise(function() {
-            return Promise.resolve();
-        });
-        
-        qz.security.setSignaturePromise(function() {
-            return function() {
-                return Promise.resolve();
-            };
-        });
-
-        window.onload = async function() {
-            // Manejador global para suprimir alertas de seguridad en la consola de desarrollo
-            const originalConsoleError = console.error;
-            console.error = function(...args) {
-                if (args[0] && (args[0].toString().includes("WebSocket") || args[0].toString().includes("SecurityError"))) {
-                    return; 
-                }
-                originalConsoleError.apply(console, args);
-            };
-
-            const statusText = document.getElementById('statusText');
-            const diagnosticBox = document.getElementById('diagnostic');
-            const btnManual = document.getElementById('btnManual');
-
-            // Si la conexión tarda más de 3.5 segundos, mostramos de inmediato el botón de Impresión Manual
-            // para que el usuario no se quede esperando y pueda imprimir sin problemas
-            let warningTimeout = setTimeout(() => {
-                statusText.innerHTML = '⚡ <strong>La conexión está demorando...</strong><br><small>QZ Tray no responde. Si deseas, puedes usar el botón de abajo para imprimir de inmediato.</small>';
-                btnManual.style.display = 'block';
-            }, 3500);
-
-            try {
-                statusText.innerHTML = 'Conectando con <strong>QZ Tray</strong> local...';
-
-                // Implementamos un límite de tiempo (timeout) de 5 segundos.
-                // Si en 5 segundos no se logra la conexión por red local, se cancela y se salta al catch.
-                await Promise.race([
-                    qz.websocket.connect({ keepAlive: 15 }),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error("La impresora local no respondió a tiempo (Timeout 5s)")), 5000))
-                ]);
-                
-                // Si la conexión fue exitosa, cancelamos el temporizador de advertencia
-                clearTimeout(warningTimeout);
-
-                statusText.innerHTML = '✅ Conectado a QZ. Enviando a <strong>POSPrinter POS80</strong>...';
-
-                // Configurar la impresora física POSPrinter POS80
-                const config = qz.configs.create("POSPrinter POS80");
-
-                // Comandos nativos de impresión térmica ESC/POS para POSPrinter POS80
-                const data = [
-                    "\x1B\x40",           // Resetear impresora
-                    "\x1B\x61\x01",       // Centrar texto
-                    "\x1B\x21\x30",       // Texto en tamaño grande
-                    "MADELU\n",
-                    "\x1B\x21\x00",       // Texto normal
-                    "Comprobante de Pago\n",
-                    "--------------------------------\n",
-                    "\x1B\x61\x00",       // Alinear a la izquierda
-                    "REGISTRO DE ABONO\n",
-                    "--------------------------------\n",
-                    "Nombre:  " + nombre + "\n",
-                    "Fecha:   " + fecha + "\n",
-                    "F. Pago: " + formapago + "\n",
-                    "--------------------------------\n",
-                    "\x1B\x21\x10",       // Doble ancho para Abono
-                    "ABONO: " + abono + "\n",
-                    "\x1B\x21\x00",       // Retornar a normal
-                    "--------------------------------\n",
-                    "S. Act:  " + saldoactual + "\n",
-                    "--------------------------------\n",
-                    "\x1B\x61\x01",       // Centrar
-                    "Gracias por su pago!\n",
-                    "App por BtoolsEC\n",
-                    "\n\n\n",             // Espacio físico de corte
-                    "\x1D\x56\x41\x10"    // Comando nativo para cortar papel térmico
-                ];
-
-                await qz.print(config, data);
-                await qz.websocket.disconnect();
-                statusText.innerHTML = '✅ ¡Ticket impreso en POSPrinter POS80!';
-
-            } catch (err) {
-                // Cancelar temporizador ya que detectamos el fin del intento (con error)
-                clearTimeout(warningTimeout);
-                console.warn("Error de enlace QZ:", err.message);
-                
-                statusText.innerHTML = '⚠️ <strong>Impresión automática no disponible</strong>';
-                btnManual.style.display = 'block';
-                
-                // Caja de diagnóstico útil para cuando la conexión no se logra establecer
-                diagnosticBox.style.display = 'block';
-                diagnosticBox.innerHTML = `
-                    <strong>Guía de solución rápida:</strong><br><br>
-                    • Asegúrate de tener abierto <strong>QZ Tray</strong> en tu computadora (icono "Q" verde al lado del reloj).<br>
-                    • Si usas HTTPS (dirección segura en la web), el navegador a veces bloquea conexiones locales. Puedes usar el botón verde de <strong>"Imprimir Manual"</strong> que hará una impresión clásica excelente y limpia.<br>
-                    • Tu impresora térmica debe llamarse <strong>POSPrinter POS80</strong> en Windows.<br><br>
-                    <em>Detalle técnico: ${err.message}</em>
-                `;
-            }
         }
     </script>
 
