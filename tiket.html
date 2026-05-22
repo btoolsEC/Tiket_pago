@@ -179,6 +179,13 @@
 
         <hr class="divider">
 
+        <div class="dato">
+            <span class="label">Saldo Actual:</span>
+            <span class="valor" id="saldoactual"></span>
+        </div>
+
+        <hr class="divider">
+
         <div class="footer">
             <p>¡Gracias por su pago!</p>
             <p class="btoolsec">App desarrollada por BtoolsEC</p>
@@ -191,8 +198,8 @@
         document.getElementById('fecha').textContent = params.get('fecha') || 'N/D';
         document.getElementById('formapago').textContent = params.get('formapago') || 'N/D';
         document.getElementById('abono').textContent = '$ ' + (params.get('abono') || '0.00');
+        document.getElementById('saldoactual').textContent = '$ ' + (params.get('saldoactual') || '0.00');
 
-        // Abrir diálogo de impresión automáticamente al cargar
         window.onload = function() {
             window.print();
         }
