@@ -135,14 +135,15 @@
         }
 
         .diagnostic-box {
-            font-size: 8pt;
+            font-size: 8.5pt;
             color: #d32f2f;
             background-color: #ffebee;
-            padding: 8px;
+            padding: 10px;
             border-radius: 4px;
             margin-top: 8px;
             text-align: left;
             border-left: 3px solid #f44336;
+            line-height: 1.4;
         }
 
         /* --- REGLAS EXCLUSIVAS PARA IMPRESIÓN --- */
@@ -249,7 +250,6 @@
         }
 
         // Configuración requerida para saltar bloqueos de seguridad del cliente local de QZ Tray
-        // Esto le indica a QZ que confíe en las peticiones locales sin requerir firmas criptográficas estrictas
         qz.security.setCertificatePromise(function() {
             return Promise.resolve();
         });
@@ -274,21 +274,26 @@
             const diagnosticBox = document.getElementById('diagnostic');
             const btnManual = document.getElementById('btnManual');
 
+            // Colocamos un aviso temporal si se demora la conexión nativa de QZ
+            let warningTimeout = setTimeout(() => {
+                statusText.innerHTML = '⚡ <strong>La conexión está demorando...</strong><br><small>QZ Tray está buscando la impresora local. Por favor, espera.</small>';
+            }, 3500);
+
             try {
                 statusText.innerHTML = 'Conectando con <strong>QZ Tray</strong> local...';
 
-                // Intentamos la conexión configurando parámetros adicionales si fuesen requeridos
-                await Promise.race([
-                    qz.websocket.connect({ keepAlive: 15 }),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout de conexión (8s)")), 8000))
-                ]);
+                // Nos conectamos de manera persistente a QZ Tray
+                await qz.websocket.connect({ keepAlive: 15 });
+                
+                // Si conecta exitosamente, limpiamos el temporizador de advertencia
+                clearTimeout(warningTimeout);
 
                 statusText.innerHTML = '✅ Conectado a QZ. Enviando a <strong>POSPrinter POS80</strong>...';
 
-                // Configurar la impresora física
+                // Configurar la impresora física POSPrinter POS80
                 const config = qz.configs.create("POSPrinter POS80");
 
-                // Comandos ESC/POS para la ticketera
+                // Comandos nativos de impresión térmica ESC/POS para POSPrinter POS80
                 const data = [
                     "\x1B\x40",           // Resetear impresora
                     "\x1B\x61\x01",       // Centrar texto
@@ -313,31 +318,35 @@
                     "\x1B\x61\x01",       // Centrar
                     "Gracias por su pago!\n",
                     "App por BtoolsEC\n",
-                    "\n\n\n",             // Espacio de corte
-                    "\x1D\x56\x41\x10"    // Cortar
+                    "\n\n\n",             // Espacio físico de corte
+                    "\x1D\x56\x41\x10"    // Comando nativo para cortar papel térmico
                 ];
 
                 await qz.print(config, data);
                 await qz.websocket.disconnect();
-                statusText.innerHTML = '✅ ¡Ticket impreso correctamente!';
+                statusText.innerHTML = '✅ ¡Ticket impreso en POSPrinter POS80!';
 
             } catch (err) {
+                clearTimeout(warningTimeout);
                 console.warn("Error de enlace QZ:", err.message);
                 
-                statusText.innerHTML = '⚠️ <strong>QZ Tray bloqueó la conexión</strong>';
+                statusText.innerHTML = '⚠️ <strong>QZ Tray no disponible en esta PC</strong>';
                 btnManual.style.display = 'block';
                 
-                // Mostrar caja de diagnóstico específica para el bloqueo del cliente de QZ
+                // Caja de diagnóstico optimizada para POSPrinter POS80
                 diagnosticBox.style.display = 'block';
                 diagnosticBox.innerHTML = `
-                    <strong>¿Cómo desbloquear QZ Tray en tu PC?</strong><br>
-                    QZ Tray ha bloqueado la conexión desde esta página web por políticas de seguridad locales.<br><br>
-                    <strong>Solución rápida (Pasos en tu PC):</strong><br>
-                    1. Busca el icono de la <strong>"Q" verde</strong> al lado del reloj de Windows.<br>
-                    2. Haz clic derecho sobre él y ve a <strong>"Allowed Hosts"</strong> (Hosts permitidos) o <strong>"Site Manager"</strong>.<br>
-                    3. Verifica si la dirección de tu página de GitHub está bloqueada o añádela a la lista de permitidos.<br>
-                    4. Alternativamente, haz clic derecho en la "Q" verde, selecciona <strong>"Exit" (Salir)</strong> y vuelve a abrir el programa QZ Tray desde el inicio de Windows.<br><br>
-                    <em>Detalle técnico: ${err.message}</em>
+                    <strong>Guía de solución rápida en tu computadora:</strong><br><br>
+                    <strong>1. Abre QZ Tray:</strong><br>
+                    Verifica que el icono de la <strong>"Q" verde</strong> esté visible al lado del reloj de Windows.<br><br>
+                    
+                    <strong>2. Verifica el nombre exacto:</strong><br>
+                    La impresora térmica debe llamarse exactamente <strong>"POSPrinter POS80"</strong> en tu Panel de Control de Windows.<br><br>
+                    
+                    <strong>3. Permisos en el Navegador:</strong><br>
+                    Si te da error de bloqueo, haz clic derecho sobre la "Q" verde de QZ Tray, selecciona <em>Exit</em>, vuelve a abrir el programa y confirma los permisos ("Allow") al recargar esta página web.<br><br>
+                    
+                    <em>Detalle del error: ${err.message}</em>
                 `;
             }
         }
