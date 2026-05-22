@@ -18,13 +18,20 @@
         }
 
         .btn-print {
-            padding: 10px 30px;
+            padding: 12px 30px;
             background-color: #4CAF50;
             color: white;
             border: none;
             border-radius: 8px;
             font-size: 14pt;
             cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: background-color 0.2s;
+        }
+
+        .btn-print:hover {
+            background-color: #45a049;
         }
 
         .ticket {
@@ -33,6 +40,7 @@
             padding: 4mm;
             box-sizing: border-box;
             border: 0.1mm solid #ddd;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
         }
 
         .header {
@@ -116,15 +124,21 @@
 
         .status {
             font-size: 10pt;
-            color: #555;
+            color: #333;
             text-align: center;
+            max-width: 300px;
+            line-height: 1.4;
+            padding: 8px;
+            border-radius: 6px;
+            background-color: #fff;
+            border: 1px solid #ddd;
         }
     </style>
 </head>
 <body>
 
-    <p class="status" id="status">Conectando con impresora...</p>
-    <button class="btn-print" id="btnManual" style="display:none" onclick="imprimirManual()">🖨️ Imprimir Manual</button>
+    <p class="status" id="status">Iniciando servicio de impresión...</p>
+    <button class="btn-print" id="btnManual" style="display:none" onclick="imprimirManual()">🖨️ Imprimir Manual (Ctrl+P)</button>
 
     <div class="ticket" id="ticket">
         <div class="header">
@@ -174,89 +188,91 @@
     <script src="https://cdn.jsdelivr.net/npm/qz-tray@2.2.4/qz-tray.js"></script>
 
     <script>
+        // Obtener parámetros de la URL enviados desde AppSheet
         const params = new URLSearchParams(window.location.search);
-        document.getElementById('nombre').textContent = params.get('nombre') || '';
-        document.getElementById('fecha').textContent = params.get('fecha') || '';
-        document.getElementById('formapago').textContent = params.get('formapago') || '';
-        document.getElementById('abono').textContent = '$ ' + (params.get('abono') || '0.00');
         
-        const saldoActualVal = params.get('saldoactual') || '0.00';
-        document.getElementById('saldoactual').textContent = '$ ' + saldoActualVal;
-
-        const nombre = params.get('nombre') || '';
-        const fecha = params.get('fecha') || '';
-        const formapago = params.get('formapago') || '';
+        const nombre = params.get('nombre') || 'N/D';
+        const fecha = params.get('fecha') || 'N/D';
+        const formapago = params.get('formapago') || 'N/D';
         const abono = params.get('abono') || '0.00';
-        const saldoactual = saldoActualVal;
+        const saldoactual = params.get('saldoactual') || '0.00';
+
+        // Pintar los datos en el ticket visual de la página
+        document.getElementById('nombre').textContent = nombre;
+        document.getElementById('fecha').textContent = fecha;
+        document.getElementById('formapago').textContent = formapago;
+        document.getElementById('saldoactual').textContent = '$ ' + saldoactual;
+        document.getElementById('abono').textContent = '$ ' + abono;
 
         function imprimirManual() {
             window.print();
         }
 
         window.onload = async function() {
-            // Manejador global para prevenir errores no capturados de seguridad de WebSockets en el entorno de desarrollo/Canvas
+            // Manejador global para suprimir las alertas de consola en entornos que de por sí bloqueen WebSockets (como Canvas de IA)
             const originalConsoleError = console.error;
             console.error = function(...args) {
                 if (args[0] && (args[0].toString().includes("WebSocket") || args[0].toString().includes("SecurityError"))) {
-                    // Ocultamos de la consola visual el SecurityError repetitivo de WebSockets en modo desarrollo
-                    return;
+                    return; // Ignorar errores de sandbox del visor de IA
                 }
                 originalConsoleError.apply(console, args);
             };
 
             try {
-                // Validación para evitar bloqueos del navegador si se ejecuta dentro de un iframe con políticas estrictas de seguridad (Sandbox)
-                if (window.location.hostname === "localhost" || window.location.protocol === "file:") {
-                    console.log("Modo local o restringido detectado. Intentando conexión segura.");
-                }
+                document.getElementById('status').innerHTML = 'Conectando con <strong>QZ Tray</strong> local...';
 
-                document.getElementById('status').textContent = 'Intentando conectar con impresora local...';
-                
-                // Conectamos con un timeout controlado para evitar esperas infinitas o fallas de seguridad del navegador
+                // Intentar conectar con QZ Tray. El tiempo límite es de 8 segundos para dar margen
+                // a que el software de tu computadora escanee y responda en su puerto correspondiente.
                 await Promise.race([
                     qz.websocket.connect(),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout al conectar con QZ Tray")), 4000))
+                    new Promise((_, reject) => setTimeout(() => reject(new Error("La conexión tardó demasiado")), 8000))
                 ]);
 
-                document.getElementById('status').textContent = '✅ Impresora conectada, imprimiendo...';
+                document.getElementById('status').innerHTML = '✅ Impresora conectada. Enviando ticket...';
 
+                // Configurar la impresora con el nombre exacto de tu ticketera térmica (ej: "PR-255")
                 const config = qz.configs.create("PR-255");
 
+                // Construcción de comandos ESC/POS para la ticketera física
                 const data = [
-                    "\x1B\x40",           // Reset impresora
-                    "\x1B\x61\x01",       // Centrar
-                    "\x1B\x21\x30",       // Texto grande
+                    "\x1B\x40",           // Resetear impresora
+                    "\x1B\x61\x01",       // Centrar texto
+                    "\x1B\x21\x30",       // Texto en tamaño grande
                     "MADELU\n",
-                    "\x1B\x21\x00",       // Texto normal
+                    "\x1B\x21\x00",       // Volver a texto normal
                     "Comprobante de Pago\n",
                     "--------------------------------\n",
-                    "\x1B\x61\x00",       // Izquierda
+                    "\x1B\x61\x00",       // Alinear a la izquierda
                     "REGISTRO DE ABONO\n",
                     "--------------------------------\n",
                     "Nombre:  " + nombre + "\n",
                     "Fecha:   " + fecha + "\n",
                     "F. Pago: " + formapago + "\n",
-                    "S. Act:  $ " + saldoactual + "\n",
+                    "S. Act:  $ " + saldoactual + "\n", // El dato de Saldo Actual solicitado
                     "--------------------------------\n",
-                    "\x1B\x21\x10",       // Texto doble ancho
+                    "\x1B\x21\x10",       // Texto con doble ancho para destacar el Abono
                     "ABONO: $ " + abono + "\n",
-                    "\x1B\x21\x00",       // Texto normal
+                    "\x1B\x21\x00",       // Retornar a texto normal
                     "--------------------------------\n",
-                    "\x1B\x61\x01",       // Centrar
+                    "\x1B\x61\x01",       // Centrar texto
                     "Gracias por su pago!\n",
                     "App por BtoolsEC\n",
-                    "\n\n\n",
-                    "\x1D\x56\x41\x10"    // Cortar papel
+                    "\n\n\n",             // Espaciado para el corte
+                    "\x1D\x56\x41\x10"    // Comando físico para cortar el papel
                 ];
 
+                // Enviar trabajo a la impresora
                 await qz.print(config, data);
+                
+                // Desconectar ordenadamente de QZ Tray
                 await qz.websocket.disconnect();
-                document.getElementById('status').textContent = '✅ Impreso correctamente';
+                document.getElementById('status').innerHTML = '✅ ¡Ticket impreso con éxito!';
 
             } catch (err) {
-                // Captura controlada del error de WebSocket/Seguridad
-                console.warn("No se pudo conectar de manera automática con QZ Tray:", err.message);
-                document.getElementById('status').textContent = '⚠️ QZ Tray no disponible o bloqueado por seguridad. Usa el botón manual.';
+                console.warn("Conexión directa a QZ Tray omitida/fallida:", err.message);
+                
+                // Mensaje amigable si QZ Tray no está abierto en la computadora del usuario
+                document.getElementById('status').innerHTML = '⚠️ No se pudo conectar automáticamente con la ticketera.<br><small>Asegúrate de tener QZ Tray abierto en tu computadora o usa el botón de abajo.</small>';
                 document.getElementById('btnManual').style.display = 'block';
             }
         }
