@@ -133,6 +133,32 @@
             background-color: #fff;
             border: 1px solid #ddd;
         }
+
+        /* --- REGLAS EXCLUSIVAS PARA IMPRESIÓN --- */
+        @media print {
+            body {
+                background-color: #fff;
+                display: block; /* Desactiva flexbox para evitar desajustes en el papel */
+                min-height: auto;
+                padding: 0;
+                margin: 0;
+            }
+
+            /* Oculta por completo el botón y los mensajes de estado */
+            .btn-print, .status {
+                display: none !important;
+            }
+
+            /* Ajusta el ticket para que se adapte perfectamente al ancho del papel térmico */
+            .ticket {
+                width: 100% !important;
+                max-width: 80mm;
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                margin: 0 auto;
+            }
+        }
     </style>
 </head>
 <body>
