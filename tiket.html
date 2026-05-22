@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        @page {
+            size: 80mm auto;
+            margin: 0;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Courier New', monospace;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            gap: 10px;
+        }
+
+        @media print {
+            .btn-print {
+                display: none;
+            }
+            body {
+                background-color: white;
+            }
+        }
+
+        .btn-print {
+            padding: 10px 30px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14pt;
+            cursor: pointer;
+        }
+
+        .btn-print:hover {
+            background-color: #45a049;
+        }
+
+        .ticket {
+            width: 80mm;
+            background-color: white;
+            padding: 4mm;
+            box-sizing: border-box;
+            border: 0.1mm solid #ddd;
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 1px dashed #000;
+            padding-bottom: 3mm;
+            margin-bottom: 3mm;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 18pt;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        .header p {
+            margin: 1mm 0;
+            font-size: 9pt;
+            color: #555;
+        }
+
+        .titulo-ticket {
+            text-align: center;
+            font-size: 11pt;
+            font-weight: bold;
+            margin-bottom: 3mm;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .dato {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10pt;
+            margin: 2mm 0;
+        }
+
+        .dato .label {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .dato .valor {
+            text-align: right;
+            color: #000;
+        }
+
+        .divider {
+            border: none;
+            border-top: 1px dashed #000;
+            margin: 3mm 0;
+        }
+
+        .total {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13pt;
+            font-weight: bold;
+            margin: 2mm 0;
+        }
+
+        .footer {
+            border-top: 1px dashed #000;
+            padding-top: 3mm;
+            margin-top: 3mm;
+            text-align: center;
+        }
+
+        .footer p {
+            margin: 1mm 0;
+            font-size: 9pt;
+            color: #555;
+        }
+
+        .footer .btoolsec {
+            font-size: 8pt;
+            color: #aaa;
+            margin-top: 2mm;
+        }
+    </style>
+</head>
+<body>
+
+    <button class="btn-print" onclick="window.print()">🖨️ Imprimir Ticket</button>
+
+    <div class="ticket">
+
+        <!-- ENCABEZADO -->
+        <div class="header">
+            <h1>MADELU</h1>
+            <p>Comprobante de Pago</p>
+        </div>
+
+        <!-- TÍTULO -->
+        <div class="titulo-ticket">Registro de Abono</div>
+
+        <!-- DATOS -->
+        <div class="dato">
+            <span class="label">Nombre:</span>
+            <span class="valor" id="nombre"></span>
+        </div>
+
+        <div class="dato">
+            <span class="label">Fecha:</span>
+            <span class="valor" id="fecha"></span>
+        </div>
+
+        <div class="dato">
+            <span class="label">Forma de Pago:</span>
+            <span class="valor" id="formapago"></span>
+        </div>
+
+        <hr class="divider">
+
+        <!-- TOTAL -->
+        <div class="total">
+            <span>ABONO:</span>
+            <span id="abono"></span>
+        </div>
+
+        <hr class="divider">
+
+        <!-- PIE DE PÁGINA -->
+        <div class="footer">
+            <p>¡Gracias por su pago!</p>
+            <p class="btoolsec">App desarrollada por BtoolsEC</p>
+        </div>
+
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        document.getElementById('nombre').textContent = params.get('nombre');
+        document.getElementById('fecha').textContent = params.get('fecha');
+        document.getElementById('formapago').textContent = params.get('formapago');
+        document.getElementById('abono').textContent = '$ ' + params.get('abono');
+    </script>
+
+</body>
+</html>
