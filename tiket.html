@@ -248,6 +248,18 @@
             window.print();
         }
 
+        // Configuración requerida para saltar bloqueos de seguridad del cliente local de QZ Tray
+        // Esto le indica a QZ que confíe en las peticiones locales sin requerir firmas criptográficas estrictas
+        qz.security.setCertificatePromise(function() {
+            return Promise.resolve();
+        });
+        
+        qz.security.setSignaturePromise(function() {
+            return function() {
+                return Promise.resolve();
+            };
+        });
+
         window.onload = async function() {
             // Manejador global para suprimir alertas redundantes de consola en entornos con restricciones WebSocket
             const originalConsoleError = console.error;
@@ -265,9 +277,9 @@
             try {
                 statusText.innerHTML = 'Conectando con <strong>QZ Tray</strong> local...';
 
-                // Intentar conectar con QZ Tray con un tiempo límite de 8 segundos
+                // Intentamos la conexión configurando parámetros adicionales si fuesen requeridos
                 await Promise.race([
-                    qz.websocket.connect(),
+                    qz.websocket.connect({ keepAlive: 15 }),
                     new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout de conexión (8s)")), 8000))
                 ]);
 
@@ -312,16 +324,20 @@
             } catch (err) {
                 console.warn("Error de enlace QZ:", err.message);
                 
-                statusText.innerHTML = '⚠️ <strong>QZ Tray no responde</strong>';
+                statusText.innerHTML = '⚠️ <strong>QZ Tray bloqueó la conexión</strong>';
                 btnManual.style.display = 'block';
                 
-                // Mostrar caja de diagnóstico para ayudarte a encontrar la falla local
+                // Mostrar caja de diagnóstico específica para el bloqueo del cliente de QZ
                 diagnosticBox.style.display = 'block';
                 diagnosticBox.innerHTML = `
-                    <strong>Guía de solución rápida:</strong><br>
-                    • Asegúrate de que el programa <strong>QZ Tray</strong> esté abierto en tu PC (icono "Q" verde).<br>
-                    • Abre una pestaña e ingresa a <a href="https://localhost:8183" target="_blank" style="color:#d32f2f; font-weight:bold;">https://localhost:8183</a> para aprobar el certificado de seguridad de Windows si el navegador lo bloqueó.<br>
-                    • Error reportado: <em>${err.message}</em>
+                    <strong>¿Cómo desbloquear QZ Tray en tu PC?</strong><br>
+                    QZ Tray ha bloqueado la conexión desde esta página web por políticas de seguridad locales.<br><br>
+                    <strong>Solución rápida (Pasos en tu PC):</strong><br>
+                    1. Busca el icono de la <strong>"Q" verde</strong> al lado del reloj de Windows.<br>
+                    2. Haz clic derecho sobre él y ve a <strong>"Allowed Hosts"</strong> (Hosts permitidos) o <strong>"Site Manager"</strong>.<br>
+                    3. Verifica si la dirección de tu página de GitHub está bloqueada o añádela a la lista de permitidos.<br>
+                    4. Alternativamente, haz clic derecho en la "Q" verde, selecciona <strong>"Exit" (Salir)</strong> y vuelve a abrir el programa QZ Tray desde el inicio de Windows.<br><br>
+                    <em>Detalle técnico: ${err.message}</em>
                 `;
             }
         }
